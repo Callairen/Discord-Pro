@@ -6,8 +6,8 @@ import time
 import webbrowser
 from typing import Any
 
-from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtGui import QAction, QCloseEvent, QGuiApplication
+from PySide6.QtCore import QSize, Qt, QTimer, Signal
+from PySide6.QtGui import QAction, QCloseEvent, QColor, QGuiApplication
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListView,
     QListWidget,
     QListWidgetItem,
     QMainWindow,
@@ -36,7 +37,15 @@ from PySide6.QtWidgets import (
 
 from discord_pro.gui.client import LiveChannel, RestClient, describe_state, fmt_ago
 from discord_pro.gui.dialogs import PresetDialog, SetupWizard
-from discord_pro.gui.widgets import ActivityForm, ErrorLabel, error_details, error_message, status_icon
+from discord_pro.gui.widgets import (
+    ActivityForm,
+    ErrorLabel,
+    IconCache,
+    error_details,
+    error_message,
+    letter_icon,
+    status_icon,
+)
 
 TOGGLE_ON = ("QPushButton { background: #1f8a4c; color: white; border-radius: 22px; padding: 10px 28px;"
              " font-size: 16px; font-weight: bold; }")
@@ -68,7 +77,10 @@ class MainWindow(QMainWindow):
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
         self.setStatusBar(QStatusBar())
+        self.icons = IconCache(self)
+        self.icons.loaded.connect(lambda _url: self._render_apps())
         self._build_dashboard()
+        self._build_apps()
         self._build_activity()
         self._build_presets()
         self._build_settings()
@@ -245,6 +257,63 @@ class MainWindow(QMainWindow):
 
         self.rest.request(method, path, body, done)
 
+    # -------------------------------------------------------------------- apps
+    def _build_apps(self) -> None:
+        page = QWidget()
+        lay = QVBoxLayout(page)
+        info = QLabel("Click an app to show it on Discord. Only one app is on at a time; click it again to turn it off.")
+        info.setWordWrap(True)
+        lay.addWidget(info)
+        self.app_list = QListWidget()
+        self.app_list.setObjectName("app_list")
+        self.app_list.setViewMode(QListView.ViewMode.IconMode)
+        self.app_list.setResizeMode(QListView.ResizeMode.Adjust)
+        self.app_list.setMovement(QListView.Movement.Static)
+        self.app_list.setWrapping(True)
+        self.app_list.setSpacing(10)
+        self.app_list.setIconSize(QSize(64, 64))
+        self.app_list.setGridSize(QSize(140, 130))
+        self.app_list.setWordWrap(True)
+        self.app_list.setSelectionMode(QListWidget.SelectionMode.NoSelection)
+        self.app_list.itemClicked.connect(lambda item: self.toggle_app(item.data(Qt.ItemDataRole.UserRole)))
+        lay.addWidget(self.app_list, 1)
+        self.app_empty = QLabel("No apps yet. Create a preset in the Presets tab — every preset appears here as an app.")
+        self.app_empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.app_empty.setWordWrap(True)
+        lay.addWidget(self.app_empty)
+        self.tabs.addTab(page, "App")
+
+    def _active_app_id(self) -> str | None:
+        p = (self.state or {}).get("presence", {})
+        return p.get("active_app_id") if p.get("enabled") else None
+
+    def _render_apps(self) -> None:
+        self.app_list.clear()
+        on_id = self._active_app_id()
+        for p in self.presets:
+            on = p["id"] == on_id
+            icon = (self.icons.get(p["icon"]) if p.get("icon") else None) or letter_icon(p["name"])
+            item = QListWidgetItem(icon, f"{p['name']}\n{'● ON' if on else 'OFF'}")
+            item.setData(Qt.ItemDataRole.UserRole, p["id"])
+            item.setToolTip(f"Turn {p['name']} off" if on else f"Show {p['name']} on Discord")
+            if on:
+                item.setBackground(QColor(31, 138, 76, 60))
+                font = item.font()
+                font.setBold(True)
+                item.setFont(font)
+            self.app_list.addItem(item)
+        self.app_empty.setVisible(not self.presets)
+
+    def toggle_app(self, preset_id: str) -> None:
+        if self._busy or self.state is None:
+            return
+        p = next((x for x in self.presets if x["id"] == preset_id), None)
+        if p is None:
+            return
+        on = preset_id == self._active_app_id()
+        self._presence_command("POST", f"/api/v1/apps/{preset_id}/toggle",
+                               f"{p['name']} turned off" if on else f"{p['name']} is live")
+
     # ---------------------------------------------------------------- activity
     def _build_activity(self) -> None:
         page = QWidget()
@@ -371,6 +440,7 @@ class MainWindow(QMainWindow):
             if p["id"] == selected:
                 self.preset_list.setCurrentItem(item)
         self.preset_empty.setVisible(not self.presets)
+        self._render_apps()
 
     def new_preset(self) -> None:
         PresetDialog(self.rest, None, (self.config or {}).get("presence"), lambda: self.notify("Preset created"), self).exec()

@@ -18,6 +18,7 @@
   },
   "presence_client_id": "",
   "active_preset_id": null,
+  "active_app_id": null,
   "server": {
     "host": "127.0.0.1",
     "port": 8765,

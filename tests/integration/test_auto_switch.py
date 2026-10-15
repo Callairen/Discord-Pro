@@ -69,3 +69,13 @@ def test_running_process_names_lists_this_process():
     names = running_process_names()
     assert names and all(n == n.lower() for n in names)
     assert any("python" in n for n in names)
+
+
+def test_app_switched_on_by_hand_is_not_overridden(client, auth, discord):
+    configure(client, auth)
+    vs, kali = _presets(client, auth)
+    client.post(f"/api/v1/apps/{kali['id']}/toggle", headers=auth)
+    tick(client, {"code.exe"})
+    st = client.get("/api/v1/state", headers=auth).json()
+    assert st["presence"]["active_app_id"] == kali["id"]
+    assert discord.activity["details"] == "Pentesting Mode"

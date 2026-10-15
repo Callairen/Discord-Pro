@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QObject, Qt, QUrl, Signal
 from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
+from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -54,6 +55,52 @@ def status_icon(state: str, size: int = 64) -> QIcon:
     p.drawText(0, 0, int(size * 0.72), int(size * 0.72), Qt.AlignmentFlag.AlignCenter, "D")
     p.end()
     return QIcon(pix)
+
+
+def letter_icon(name: str, size: int = 64) -> QIcon:
+    """Fallback app logo: the first letter of the name on a rounded tile."""
+    pix = QPixmap(size, size)
+    pix.fill(Qt.GlobalColor.transparent)
+    p = QPainter(pix)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    p.setBrush(QColor("#5865f2"))
+    p.setPen(Qt.PenStyle.NoPen)
+    p.drawRoundedRect(0, 0, size, size, size * 0.22, size * 0.22)
+    p.setPen(QColor("#ffffff"))
+    f = QFont()
+    f.setBold(True)
+    f.setPixelSize(int(size * 0.5))
+    p.setFont(f)
+    p.drawText(0, 0, size, size, Qt.AlignmentFlag.AlignCenter, (name.strip()[:1] or "?").upper())
+    p.end()
+    return QIcon(pix)
+
+
+class IconCache(QObject):
+    """Downloads app logos (https URLs) once; ``loaded`` fires when one arrives."""
+
+    loaded = Signal(str)
+
+    def __init__(self, parent: QObject | None = None):
+        super().__init__(parent)
+        self._nam = QNetworkAccessManager(self)
+        self._icons: dict[str, QIcon | None] = {}  # None = downloading or failed
+
+    def get(self, url: str) -> QIcon | None:
+        if url not in self._icons:
+            self._icons[url] = None
+            req = QNetworkRequest(QUrl(url))
+            req.setTransferTimeout(15000)
+            reply = self._nam.get(req)
+            reply.finished.connect(lambda: self._finished(url, reply))
+        return self._icons[url]
+
+    def _finished(self, url: str, reply: QNetworkReply) -> None:
+        pix = QPixmap()
+        if reply.error() == QNetworkReply.NetworkError.NoError and pix.loadFromData(bytes(reply.readAll())):
+            self._icons[url] = QIcon(pix)
+            self.loaded.emit(url)
+        reply.deleteLater()
 
 
 class ErrorLabel(QLabel):

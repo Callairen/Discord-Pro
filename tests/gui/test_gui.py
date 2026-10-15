@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "e2e"))
 from fakes import FakeDiscordIPC, short_socket_dir  # noqa: E402
 from harness import CID, BackendProcess  # noqa: E402
 
+from PySide6.QtCore import Qt  # noqa: E402
 from PySide6.QtWidgets import QApplication, QWizard  # noqa: E402
 
 SHOTS = Path(os.environ.get("DISCORD_PRO_SCREENSHOTS", Path(__file__).resolve().parents[2] / "docs" / "screenshots"))
@@ -127,7 +128,7 @@ def test_activity_save_apply_and_validation(window, env, qapp):
     configure(b)
     httpx.post(f"{b.url}/api/v1/presence/enable", headers=b.headers(), timeout=30)
     pump(qapp, lambda: window.activity_form.inputs["details"].text() == "GUI test")
-    window.tabs.setCurrentIndex(1)
+    window.tabs.setCurrentIndex(2)
     form = window.activity_form
     form.inputs["button1_label"].setText("Bad")
     form.inputs["button1_url"].setText("javascript:alert(1)")
@@ -150,12 +151,32 @@ def test_preset_activation_from_gui(window, env, qapp):
                json={"name": "VS Code", "process_names": ["Code.exe"],
                      "activity": {"details": "Coding Session", "state": "Visual Studio Code"}})
     pump(qapp, lambda: window.preset_list.count() == 1)
-    window.tabs.setCurrentIndex(2)
+    window.tabs.setCurrentIndex(3)
     window.preset_list.setCurrentRow(0)
     window.activate_preset(True)
     pump(qapp, lambda: ipc.current_activity is not None and ipc.current_activity.get("details") == "Coding Session")
     pump(qapp, lambda: window.preset_list.item(0).text().startswith("✓"))
     window.grab().save(str(SHOTS / "gui-presets.png"))
+
+
+def test_app_toggle_from_gui(window, env, qapp):
+    b, ipc = env
+    configure(b)
+    for name, details in [("Mobile Legends", "Ranked match"), ("Spotify", "Listening")]:
+        httpx.post(f"{b.url}/api/v1/presets", headers=b.headers(),
+                   json={"name": name, "activity": {"details": details, "state": "Playing now"}})
+    pump(qapp, lambda: window.app_list.count() == 2)
+    window.tabs.setCurrentIndex(1)
+    ml, sp = (window.app_list.item(i).data(Qt.ItemDataRole.UserRole) for i in range(2))
+    window.toggle_app(ml)
+    pump(qapp, lambda: ipc.current_activity is not None and ipc.current_activity.get("details") == "Ranked match")
+    pump(qapp, lambda: window.app_list.item(0).text().endswith("ON") and not window._busy)
+    window.toggle_app(sp)
+    pump(qapp, lambda: ipc.current_activity is not None and ipc.current_activity.get("details") == "Listening")
+    pump(qapp, lambda: window.app_list.item(1).text().endswith("ON") and window.app_list.item(0).text().endswith("OFF"))
+    window.grab().save(str(SHOTS / "gui-apps.png"))
+    window.toggle_app(sp)
+    pump(qapp, lambda: not window.state["presence"]["enabled"] and window.app_list.item(1).text().endswith("OFF"))
 
 
 def test_close_hides_window_backend_keeps_running(window, env, qapp, monkeypatch):
@@ -191,7 +212,7 @@ def test_backend_restart_gui_reconnects(window, env, qapp):
 
 def test_settings_save(window, env, qapp):
     b, _ = env
-    window.tabs.setCurrentIndex(3)
+    window.tabs.setCurrentIndex(4)
     pump(qapp, lambda: window.access_code.text() != "")
     window.attempts.setValue(42)
     window.save_settings()

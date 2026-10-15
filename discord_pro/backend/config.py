@@ -82,6 +82,9 @@ class AppConfig(BaseModel):
     # application.client_id (set when a preset with its own ID is activated).
     presence_client_id: str = ""
     active_preset_id: str | None = None
+    # Preset switched ON from the App section. Kept across restarts: the
+    # backend turns that app back on when it starts.
+    active_app_id: str | None = None
     server: ServerSettings = Field(default_factory=ServerSettings)
     rpc: RpcSettings = Field(default_factory=RpcSettings)
     auto_switch: AutoSwitchSettings = Field(default_factory=AutoSwitchSettings)
@@ -194,7 +197,7 @@ class ConfigStore:
             except (ValidationError, AttributeError):
                 self.warnings.append(f"section '{name}' was invalid and has been reset to defaults")
                 data[name] = getattr(defaults, name).model_dump(mode="json")
-        for name in ("presence_client_id", "active_preset_id"):
+        for name in ("presence_client_id", "active_preset_id", "active_app_id"):
             try:
                 data[name] = AppConfig.model_validate({**data, name: raw.get(name)}).model_dump()[name]
             except ValidationError:

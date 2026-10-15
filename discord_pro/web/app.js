@@ -285,6 +285,41 @@ function dashboardView() {
   return { el: root, update };
 }
 
+function appIcon(p) {
+  const fallback = h("span", { class: "app-letter", "aria-hidden": "true" }, (p.name.trim()[0] || "?").toUpperCase());
+  if (!p.icon) return h("div", { class: "app-icon" }, fallback);
+  const img = h("img", { src: p.icon, alt: "", loading: "lazy" });
+  img.addEventListener("error", () => img.replaceWith(fallback));
+  return h("div", { class: "app-icon" }, img);
+}
+
+function appsView() {
+  const grid = h("div", { class: "apps", role: "group", "aria-label": "Apps" });
+  const root = h("div", { class: "card" },
+    h("h1", {}, "App"),
+    h("p", { class: "muted small" }, "Click an app to show it on Discord. Only one app is on at a time; click it again to turn it off."),
+    grid);
+
+  function update() {
+    const s = store.state;
+    const onId = s && s.presence.enabled ? s.presence.active_app_id : null;
+    if (!store.presets.length) {
+      grid.replaceChildren(h("p", { class: "empty" }, "No apps yet. ",
+        h("a", { href: "#/presets" }, "Create a preset"), " — every preset appears here as an app."));
+      return;
+    }
+    grid.replaceChildren(...store.presets.map(p => {
+      const on = p.id === onId;
+      const btn = h("button", { class: "app", "aria-pressed": on ? "true" : "false", title: on ? `Turn ${p.name} off` : `Show ${p.name} on Discord` },
+        appIcon(p), h("span", { class: "app-name" }, p.name), h("span", { class: "app-state" }, on ? "ON" : "OFF"));
+      btn.addEventListener("click", () => withBusy(btn, async () =>
+        resultToast(await api.toggleApp(p.id), on ? `${p.name} turned off` : `${p.name} is live`)));
+      return btn;
+    }));
+  }
+  return { el: root, update };
+}
+
 function activityView() {
   const form = activityForm(store.config && store.config.presence, "edit");
   const cid = h("input", { type: "text", id: "edit-client-id", inputmode: "numeric", placeholder: "default Application ID" });
@@ -352,9 +387,10 @@ function presetsView() {
     list), editorSlot);
 
   function openEditor(preset) {
-    const p = preset || { name: "", client_id: "", process_names: [], activity: (store.config && store.config.presence) || {} };
+    const p = preset || { name: "", client_id: "", process_names: [], icon: "", activity: (store.config && store.config.presence) || {} };
     const name = h("input", { type: "text", id: "preset-name", maxlength: 64, value: p.name });
     const cid = h("input", { type: "text", id: "preset-cid", inputmode: "numeric", value: p.client_id || "" });
+    const icon = h("input", { type: "text", id: "preset-icon", maxlength: 512, value: p.icon || "", placeholder: "https://…/logo.png" });
     const procs = h("input", { type: "text", id: "preset-procs", value: (p.process_names || []).join(", "), placeholder: "Code.exe, Figma.exe" });
     const form = activityForm(p.activity, "preset");
     const err = h("div", { class: "field-error", hidden: true });
@@ -364,6 +400,8 @@ function presetsView() {
       h("div", { class: "row" }, h("label", { for: "preset-name" }, "Name"), h("div", {}, name)),
       h("div", { class: "row" }, h("label", { for: "preset-cid" }, "Application ID (optional)"),
         h("div", {}, cid, h("div", { class: "hint" }, "Use a different Discord application for this preset; empty = default."))),
+      h("div", { class: "row" }, h("label", { for: "preset-icon" }, "App logo (optional)"),
+        h("div", {}, icon, h("div", { class: "hint" }, "https:// image URL shown on the card in the App section."))),
       h("div", { class: "row" }, h("label", { for: "preset-procs" }, "Auto-switch processes"),
         h("div", {}, procs, h("div", { class: "hint" }, "Comma-separated executable names. Used when auto-switch is enabled in Settings."))),
       form.el, err,
@@ -371,7 +409,7 @@ function presetsView() {
     saveBtn.addEventListener("click", () => withBusy(saveBtn, async () => {
       form.setErrors([]); err.hidden = true;
       const body = {
-        name: name.value.trim(), client_id: cid.value.trim(), activity: form.read(),
+        name: name.value.trim(), client_id: cid.value.trim(), icon: icon.value.trim(), activity: form.read(),
         process_names: procs.value.split(",").map(s => s.trim()).filter(Boolean),
       };
       try {
@@ -570,7 +608,7 @@ function settingsView() {
   return { el: root, update };
 }
 
-const ROUTES = { dashboard: dashboardView, activity: activityView, presets: presetsView, setup: setupView, settings: settingsView };
+const ROUTES = { dashboard: dashboardView, apps: appsView, activity: activityView, presets: presetsView, setup: setupView, settings: settingsView };
 
 function route() {
   if (!store.authed) return;

@@ -66,6 +66,7 @@ class StateManager:
                 "connection_state": "DISCONNECTED",
                 "last_successful_update": None,
                 "active_preset_id": None,
+                "active_app_id": None,
                 "current_activity": None,
                 "applied": True,
                 "enabled_by": None,

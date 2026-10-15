@@ -76,7 +76,7 @@ class PresenceService:
                 "problems": problems,
                 "warnings": self.config_store.warnings + self.presets.warnings,
             },
-            presence={"active_preset_id": cfg.active_preset_id, "applied": applied},
+            presence={"active_preset_id": cfg.active_preset_id, "active_app_id": cfg.active_app_id, "applied": applied},
             auto_switch={"enabled": cfg.auto_switch.enabled},
         )
 
@@ -129,6 +129,10 @@ class PresenceService:
         await self.state.update(presence={"enabled": False, "enabled_by": None})
         result = await self.manager.apply(Desired(False))
         self._session_start = None
+        if self.config.active_app_id is not None:
+            # Presence is off, so no app is ON any more (also not after a restart).
+            self._save_config({"active_app_id": None})
+            self.state.broadcast("config.updated", self.config.public_dict())
         await self.refresh_config_state()
         return await self._log("presence.disable", result, source)
 
@@ -146,7 +150,8 @@ class PresenceService:
     async def update_activity(self, activity: Activity, *, apply: bool, client_id: str | None = None,
                               source: str = "api") -> OperationResult:
         async with self._lock:
-            patch: dict[str, Any] = {"presence": activity.model_dump(mode="json"), "active_preset_id": None}
+            patch: dict[str, Any] = {"presence": activity.model_dump(mode="json"), "active_preset_id": None,
+                                     "active_app_id": None}
             if client_id is not None:
                 patch["presence_client_id"] = client_id
             self._save_config(patch)
@@ -221,8 +226,10 @@ class PresenceService:
         async with self._lock:
             preset = self.presets.get(preset_id)
             self.presets.delete(preset_id)
-            if self.config.active_preset_id == preset_id:
-                self._save_config({"active_preset_id": None})
+            patch = {key: None for key in ("active_preset_id", "active_app_id")
+                     if getattr(self.config, key) == preset_id}
+            if patch:
+                self._save_config(patch)
                 self.state.broadcast("config.updated", self.config.public_dict())
             if self._auto_preset == preset_id:
                 self._auto_preset = None
@@ -234,7 +241,8 @@ class PresenceService:
         async with self._lock:
             return await self._activate_locked(preset_id, enable=enable, source=source)
 
-    async def _activate_locked(self, preset_id: str, *, enable: bool, source: str) -> OperationResult:
+    async def _activate_locked(self, preset_id: str, *, enable: bool, source: str,
+                               as_app: bool = False) -> OperationResult:
         preset = self.presets.get(preset_id)
         candidate_id = preset.client_id or self.config.application.client_id
         if not candidate_id:
@@ -248,14 +256,41 @@ class PresenceService:
             "presence": preset.activity.model_dump(mode="json"),
             "presence_client_id": preset.client_id,
             "active_preset_id": preset.id,
+            "active_app_id": preset.id if as_app else None,
         })
         self.state.broadcast("config.updated", self.config.public_dict())
         await self.refresh_config_state()
-        await self.state.record_event("preset.activate", f"Preset '{preset.name}' activated", source=source)
+        if as_app:
+            await self.state.record_event("app.on", f"App '{preset.name}' turned on", source=source)
+        else:
+            await self.state.record_event("preset.activate", f"Preset '{preset.name}' activated", source=source)
         if enable and not self.manager.desired.enabled:
             return await self._enable_locked(source)
         result = await self._republish_if_enabled(source)
         return result
+
+    # ------------------------------------------------------------------ apps
+    async def toggle_app(self, preset_id: str, source: str = "api") -> OperationResult:
+        """App section: switch a preset ON (replacing any other app) or OFF."""
+        async with self._lock:
+            preset = self.presets.get(preset_id)
+            if self.config.active_app_id == preset_id and self.manager.desired.enabled:
+                result = await self._disable_locked(source)
+                await self.state.record_event("app.off", f"App '{preset.name}' turned off", source=source)
+                return result
+            return await self._activate_locked(preset_id, enable=True, source=source, as_app=True)
+
+    async def restore_app(self) -> None:
+        """At startup: turn the app that was ON at shutdown back on."""
+        async with self._lock:
+            app_id = self.config.active_app_id
+            if app_id is None:
+                return
+            if all(p.id != app_id for p in self.presets.list()):  # deleted while the backend was down
+                self._save_config({"active_app_id": None})
+                await self.refresh_config_state()
+                return
+            await self._activate_locked(app_id, enable=True, source="startup", as_app=True)
 
     # ---------------------------------------------------------------- setup
     async def test_connection(self, client_id: str) -> OperationResult:
@@ -301,6 +336,8 @@ class PresenceService:
                 match = preset
                 break
         async with self._lock:
+            if self.config.active_app_id is not None:
+                return  # an app switched on by hand takes priority over process detection
             if match is not None and match.id != self._auto_preset:
                 self._auto_preset = match.id
                 await self.state.update(auto_switch={"matched_preset_id": match.id})

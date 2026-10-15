@@ -70,6 +70,7 @@ presence.connection_state           DISCONNECTED | CONNECTING | CONNECTED | RECO
 presence.current_activity           payload Discord accepted (null if nothing published)
 presence.last_successful_update     epoch seconds
 presence.active_preset_id
+presence.active_app_id              preset switched ON from the App section (null when off)
 presence.applied                    false when saved settings differ from what is published
 discord.rpc_connected / connected_client_id / reconnect_attempt / next_retry_in
 discord.last_error                  {code, message, kind, at} | null
@@ -109,6 +110,7 @@ Auth column: **T** = API token (`Authorization: Bearer`), **S** = browser sessio
 | PUT / DELETE | `/presets/{id}` | T/S | update / delete (404 `preset_not_found`) |
 | POST | `/presets/{id}/activate` | T/S | `{enable?}`; validated before the active config is touched |
 | POST | `/presets/{id}/duplicate` | T/S | copy |
+| POST | `/apps/{id}/toggle` | T/S | App section: turn this preset ON (activate + enable, replacing any other app) or OFF if it is the app that is on |
 | POST | `/setup/validate` | T/S | `{client_id, activity?}` → `{valid, errors[]}` (no side effects) |
 | POST | `/setup/test-connection` | T/S | real handshake; refuses (409) while presence is on with a different ID |
 | POST | `/setup/complete` | T/S | save ID + activity, mark configured, optional `test_activation` |
@@ -147,10 +149,11 @@ Client → server (`request_id` optional, 1–64 chars; a repeated `request_id` 
 | `ping`, `state.get` | `{}` |
 | `presence.enable`, `presence.disable`, `presence.apply` | `{}` |
 | `presence.update` | `{activity, apply?, client_id?}` |
-| `preset.create` | `{preset: {name, client_id?, process_names?, activity}}` |
+| `preset.create` | `{preset: {name, client_id?, process_names?, icon?, activity}}` |
 | `preset.update` | `{id, preset}` |
 | `preset.delete`, `preset.duplicate` | `{id}` |
 | `preset.activate` | `{id, enable?}` |
+| `app.toggle` | `{id}` |
 | `config.update` | `{patch}` |
 
 Invalid input produces `operation.result` with codes `invalid_json`, `invalid_message`, `invalid_request_id`, `invalid_payload`, `unknown_command`, `validation_error`, `message_too_large`, `rate_limited`; the connection stays open. Commands run through the same `PresenceService` methods as REST. The GUI and dashboard send commands over REST and use the socket for events; WebSocket commands are available to other clients and covered by tests.
@@ -158,6 +161,7 @@ Invalid input produces `operation.result` with codes `invalid_json`, `invalid_me
 ## Persistence
 
 - `config.json`: versioned (`schema_version: 1`), Pydantic-validated, written atomically (temp file + fsync + replace). Migration from a flat v0 layout. Malformed file → backup + defaults; partially invalid → only invalid sections reset (backup kept).
+- `active_app_id` in `config.json` remembers the app switched ON in the App section; on startup the backend activates it again (this takes precedence over `start_with_presence_enabled`). Turning presence off, editing the activity, activating a preset normally, or deleting the preset clears it. While it is set, process auto-switch does not override it.
 - `presets.json`: invalid entries are skipped and preserved in `presets.invalid.json`.
 - `auth.json`: API token + access code, `0600` on POSIX.
 - Browser sessions and one-time login codes are in memory only: a backend restart signs browsers out.

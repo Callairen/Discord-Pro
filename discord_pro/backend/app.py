@@ -193,7 +193,9 @@ def create_app(
             log.warning("startup: %s", warning)
         log.info("backend ready (version %s)", __version__)
         startup_task = None
-        if config.config.application.start_with_presence_enabled and not service.configuration_problems():
+        if config.config.active_app_id is not None:
+            startup_task = asyncio.create_task(service.restore_app())
+        elif config.config.application.start_with_presence_enabled and not service.configuration_problems():
             startup_task = asyncio.create_task(service.enable(source="startup"))
         try:
             yield
@@ -347,6 +349,10 @@ def create_app(
         enable_after = body.enable if body else False
         return _result_response(backend, await service.activate_preset(preset_id, enable=enable_after, source=p.source))
 
+    @app.post(f"{api}/apps/{{preset_id}}/toggle")
+    async def toggle_app(preset_id: str, p: Principal = Depends(limited)):
+        return _result_response(backend, await service.toggle_app(preset_id, source=p.source))
+
     @app.post(f"{api}/setup/validate")
     async def setup_validate(body: SetupValidateRequest, p: Principal = Depends(principal)):
         errors: list[dict[str, str]] = []
@@ -385,6 +391,7 @@ def create_app(
             "presence": body.activity.model_dump(mode="json"),
             "presence_client_id": "",
             "active_preset_id": None,
+            "active_app_id": None,
         }, source=p.source)
         if body.test_activation:
             return _result_response(backend, await service.enable(source=p.source))
@@ -696,6 +703,10 @@ async def _cmd_preset_activate(svc: PresenceService, p: dict) -> OperationResult
     return await svc.activate_preset(_preset_id(p), enable=bool(p.get("enable", False)), source="websocket")
 
 
+async def _cmd_app_toggle(svc: PresenceService, p: dict) -> OperationResult:
+    return await svc.toggle_app(_preset_id(p), source="websocket")
+
+
 async def _cmd_preset_create(svc: PresenceService, p: dict) -> OperationResult:
     preset = await svc.create_preset(PresetInput.model_validate(p.get("preset") or {}), source="websocket")
     return OperationResult.ok("Preset created", preset=preset.model_dump(mode="json"))
@@ -734,5 +745,6 @@ COMMANDS: dict[str, Callable[[PresenceService, dict], Any]] = {
     "preset.update": _cmd_preset_update,
     "preset.delete": _cmd_preset_delete,
     "preset.duplicate": _cmd_preset_duplicate,
+    "app.toggle": _cmd_app_toggle,
     "config.update": _cmd_config_update,
 }

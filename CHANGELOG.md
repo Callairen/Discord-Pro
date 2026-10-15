@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **App** section (GUI tab and web dashboard page, next to Dashboard): every preset is shown as an app card with its logo. Clicking a card turns that app ON (replacing any other app) or OFF. Not tied to running processes.
+- `POST /api/v1/apps/{id}/toggle` and WebSocket command `app.toggle`.
+- Optional `icon` (https image URL) on presets; `active_app_id` in `config.json` and in the canonical state. The app that was ON is turned back on when the backend starts.
+
 ## 2.0.0 – Integrated Rich Presence manager
 
 ### Added

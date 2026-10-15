@@ -238,6 +238,9 @@ class PresetDialog(QDialog):
         self.client_id.setPlaceholderText("optional — empty uses the default Application ID")
         self.procs = QLineEdit(", ".join(p.get("process_names", [])))
         self.procs.setPlaceholderText("Code.exe, Figma.exe")
+        self.icon = QLineEdit(p.get("icon", ""))
+        self.icon.setMaxLength(512)
+        self.icon.setPlaceholderText("optional — https:// image URL shown in the App tab")
         self.form = ActivityForm()
         self.form.set(p.get("activity"))
         self.error = ErrorLabel()
@@ -245,6 +248,7 @@ class PresetDialog(QDialog):
         head.addRow("Name", self.name)
         head.addRow("Application ID", self.client_id)
         head.addRow("Auto-switch processes", self.procs)
+        head.addRow("App logo", self.icon)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setWidget(self.form)
@@ -264,6 +268,7 @@ class PresetDialog(QDialog):
             "name": self.name.text().strip(),
             "client_id": self.client_id.text().strip(),
             "process_names": [s.strip() for s in self.procs.text().split(",") if s.strip()],
+            "icon": self.icon.text().strip(),
             "activity": self.form.read(),
         }
 

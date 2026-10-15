@@ -56,6 +56,7 @@ export const api = {
   deletePreset: (id) => request("DELETE", `/api/v1/presets/${encodeURIComponent(id)}`),
   duplicatePreset: (id) => request("POST", `/api/v1/presets/${encodeURIComponent(id)}/duplicate`),
   activatePreset: (id, enable) => request("POST", `/api/v1/presets/${encodeURIComponent(id)}/activate`, { enable }),
+  toggleApp: (id) => request("POST", `/api/v1/apps/${encodeURIComponent(id)}/toggle`),
   setupValidate: (client_id, activity) => request("POST", "/api/v1/setup/validate", { client_id, activity }),
   setupTest: (client_id) => request("POST", "/api/v1/setup/test-connection", { client_id }),
   setupComplete: (client_id, activity, test_activation) =>

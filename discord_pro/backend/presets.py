@@ -31,6 +31,8 @@ class PresetInput(BaseModel):
     # Process names (e.g. "Code.exe") that activate this preset when the
     # auto-switch feature is enabled. Ported from the original agents.
     process_names: list[str] = Field(default_factory=list, max_length=20)
+    # Logo shown on the preset's card in the App section (https image URL).
+    icon: str = Field(default="", max_length=512)
 
     @field_validator("name", mode="before")
     @classmethod
@@ -54,6 +56,18 @@ class PresetInput(BaseModel):
                 raise ValueError("process names must be plain executable names, e.g. Code.exe")
             out.append(name)
         return out
+
+    @field_validator("icon", mode="before")
+    @classmethod
+    def _icon(cls, v: Any) -> str:
+        if v is None:
+            return ""
+        if not isinstance(v, str):
+            return v  # rejected by the str type check
+        v = v.strip()
+        if v and (not v.lower().startswith("https://") or len(v) <= 8 or any(c.isspace() for c in v)):
+            raise ValueError("icon must be an https:// image URL")
+        return v
 
 
 class Preset(PresetInput):
