@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Build output (never commit binaries)
+build/
+dist/
+*.exe
+
+# Local configuration, secrets and logs (live in the app-data dir, but just in case)
+.env
+config.json
+presets.json
+auth.json
+instance.json
+backend.lock
+logs/
+*.log
+
+# Test artefacts
+test-results/

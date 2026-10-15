@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Discord-Pro</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/static/style.css">
+  <script type="module" src="/static/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="logo" aria-hidden="true">◆</span> Discord-Pro</div>
+    <div id="conn" class="pill" data-state="DISCONNECTED" role="status" aria-live="polite">
+      <span class="pill-icon" aria-hidden="true">○</span><span class="pill-text">Loading…</span>
+    </div>
+  </header>
+  <nav id="nav" class="tabs" hidden>
+    <a href="#/dashboard" data-route="dashboard">Dashboard</a>
+    <a href="#/activity" data-route="activity">Activity</a>
+    <a href="#/presets" data-route="presets">Presets</a>
+    <a href="#/setup" data-route="setup">Setup</a>
+    <a href="#/settings" data-route="settings">Settings</a>
+  </nav>
+  <div id="banner" class="banner" hidden></div>
+  <main id="view" tabindex="-1"><p class="muted">Loading…</p></main>
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+</body>
+</html>

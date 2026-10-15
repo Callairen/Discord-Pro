@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "presets": [
+    {
+      "id": "legacy-vscode",
+      "name": "VS Code",
+      "client_id": "1468102806786281596",
+      "process_names": ["Code.exe"],
+      "activity": {
+        "activity_type": 0,
+        "details": "Coding Session",
+        "state": "Visual Studio Code",
+        "large_image": "vscode",
+        "large_text": "Writing Code",
+        "small_image": "",
+        "small_text": "",
+        "buttons": [],
+        "show_elapsed": true
+      },
+      "created_at": 0,
+      "updated_at": 0
+    },
+    {
+      "id": "legacy-kali",
+      "name": "Kali Linux (VirtualBox)",
+      "client_id": "1467854564458889519",
+      "process_names": ["VirtualBox.exe", "VirtualBoxVM.exe"],
+      "activity": {
+        "activity_type": 0,
+        "details": "Pentesting Mode",
+        "state": "Kali Linux on VirtualBox",
+        "large_image": "kalinux",
+        "large_text": "Kali Linux Lab",
+        "small_image": "",
+        "small_text": "",
+        "buttons": [],
+        "show_elapsed": true
+      },
+      "created_at": 0,
+      "updated_at": 0
+    },
+    {
+      "id": "legacy-figma",
+      "name": "Figma",
+      "client_id": "1472429360693772288",
+      "process_names": ["Figma.exe"],
+      "activity": {
+        "activity_type": 0,
+        "details": "",
+        "state": "Ren Workspace",
+        "large_image": "",
+        "large_text": "Figma Desktop",
+        "small_image": "",
+        "small_text": "",
+        "buttons": [],
+        "show_elapsed": true
+      },
+      "created_at": 0,
+      "updated_at": 0
+    }
+  ]
+}

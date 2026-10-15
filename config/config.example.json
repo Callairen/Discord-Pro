@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "application": {
+    "client_id": "",
+    "start_with_presence_enabled": false,
+    "setup_completed": false
+  },
+  "presence": {
+    "activity_type": 0,
+    "details": "Working on a project",
+    "state": "Development",
+    "large_image": "",
+    "large_text": "",
+    "small_image": "",
+    "small_text": "",
+    "buttons": [],
+    "show_elapsed": true
+  },
+  "presence_client_id": "",
+  "active_preset_id": null,
+  "server": {
+    "host": "127.0.0.1",
+    "port": 8765,
+    "allow_lan": false
+  },
+  "rpc": {
+    "reconnect_max_attempts": 20,
+    "reconnect_base_delay": 2.0,
+    "reconnect_max_delay": 60.0,
+    "min_update_interval": 4.0
+  },
+  "auto_switch": {
+    "enabled": false,
+    "poll_interval": 5.0
+  }
+}
